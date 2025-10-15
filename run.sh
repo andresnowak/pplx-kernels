@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=alltoall-torch
-#SBATCH --nodes=2
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:4
 #SBATCH --time=00:10:00
@@ -16,8 +16,9 @@ ulimit -c 0
 # Set environment variables for distributed launch (shared across all tasks)
 export MASTER_ADDR=$(scontrol show hostname $SLURM_NODELIST | head -n1)
 export MASTER_PORT=29500
-export WORLD_SIZE=$SLURM_NTASKS
-export WORLD_LOCAL_SIZE=$SLURM_NTASKS_PER_NODE
+export WORLD_LOCAL_SIZE=4
+export WORLD_SIZE=$((SLURM_NNODES * WORLD_LOCAL_SIZE))  # Total GPUs across all nodes
+
 
 export NCCL_DEBUG=INFO
 export PYTHONUNBUFFERED=1
