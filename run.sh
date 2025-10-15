@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=alltoall-torch
-#SBATCH --nodes=1
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:4
 #SBATCH --time=00:10:00
