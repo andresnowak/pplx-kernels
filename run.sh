@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=alltoall-torch
-#SBATCH --nodes=4
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:4
 #SBATCH --time=00:10:00
@@ -24,22 +24,14 @@ export NCCL_DEBUG=INFO
 export PYTHONUNBUFFERED=1
 
 # Enable GDR (GPUDirect RDMA)
+export NCCL_NET="AWS Libfabric"
 export NCCL_NET_GDR_LEVEL=PHB
-export NCCL_NET_GDR_READ=1
 export NCCL_CROSS_NIC=1
-export NCCL_IB_DISABLE=1  # Disable IB since we're using Slingshot/OFI
+export NCCL_PROTO=^LL128
 
 # Libfabric HMEM (Heterogeneous Memory) settings - force GDRCopy usage
 export FI_HMEM_CUDA_USE_GDRCOPY=1
 export FI_MR_CACHE_MONITOR=userfaultfd
-
-# Slingshot CXI fabric settings
-export FI_CXI_DISABLE_HOST_REGISTER=0  # Enable memory registration for CXI
-export FI_CXI_DEFAULT_VNI=$(id -u)  # Set VNI for user isolation
-
-# maybe remove
-export FI_CXI_RNDZV_PROTO=alt_read  # Use RDMA read for rendezvous
-export FI_CXI_RX_MATCH_MODE=hybrid
 
 echo "SLURM Configuration:"
 echo "  SLURM_JOB_ID: $SLURM_JOB_ID"
@@ -52,7 +44,7 @@ echo "  MASTER_PORT: $MASTER_PORT"
 echo "  WORLD_SIZE: $WORLD_SIZE"
 echo "  WORLD_LOCAL_SIZE: $WORLD_LOCAL_SIZE"
 
-srun --environment=pytorch2506 -u bash -lc '
+srun --environment=pytorch -u bash -lc '
 set -x
 
 # NODE_RANK must be set per-task (SLURM_PROCID is different on each node)
