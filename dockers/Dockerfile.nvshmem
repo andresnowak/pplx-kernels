@@ -1,0 +1,66 @@
+# =========================
+# Use the pytorch image which has CUDA 12.9 inside.
+# =========================
+FROM nvcr.io/nvidia/pytorch:25.06-py3 AS base
+
+ENV SHELL=/bin/bash
+ENV PIP_NO_CACHE_DIR=1
+
+
+# =========================
+# Install Python packages
+# =========================
+RUN unset PIP_CONSTRAINT && pip install debugpy dm-tree torch_tb_profiler einops wandb
+
+# =========================
+# Install NVSHMEM
+# =========================
+WORKDIR /tmp
+
+# Download NVSHMEM src
+RUN wget https://github.com/NVIDIA/nvshmem/archive/refs/tags/v3.4.5-0.tar.gz \
+       -O nvshmem-3.4.5-0.tar.gz && \
+    tar -xzf nvshmem-3.4.5-0.tar.gz && \
+    mv nvshmem-3.4.5-0 /opt/nvshmem && \
+    rm nvshmem-3.4.5-0.tar.gz
+
+RUN mkdir -p /opt/cray/libfabric/1.22.0 && \
+    cp -a /mnt/libfabric/* /opt/cray/libfabric/1.22.0/
+
+# Update environment paths
+ENV NVSHMEM_HOME=/opt/nvshmem
+ENV LIBFABRIC_HOME=/opt/cray/libfabric/1.22.0
+ENV CUDA_HOME=/usr/local/cuda
+ENV GDRCOPY_HOME=/usr/lib/aarch64-linux-gnu
+
+# NEW LINE: Create a symbolic link to trick the build system
+RUN cd $LIBFABRIC_HOME && ln -s lib64 lib
+
+
+# We don't have infiniband for IBGDA
+WORKDIR $NVSHMEM_HOME
+RUN NVSHMEM_SHMEM_SUPPORT=0 \
+    NVSHMEM_UCX_SUPPORT=0 \
+    NVSHMEM_USE_NCCL=0 \
+    NVSHMEM_MPI_SUPPORT=0 \
+    NVSHMEM_IBGDA_SUPPORT=0 \
+    NVSHMEM_PMIX_SUPPORT=0 \
+    NVSHMEM_TIMEOUT_DEVICE_POLLING=0 \
+    NVSHMEM_USE_GDRCOPY=1 \
+    NVSHMEM_LIBFABRIC_SUPPORT=1 \
+    cmake -S . -B build/ -DCMAKE_INSTALL_PREFIX=$NVSHMEM_HOME/install -DNVSHMEM_BUILD_EXAMPLES=OFF && cd build && make install -j
+
+ENV NVSHMEM_HOME=/opt/nvshmem/install
+ENV LD_LIBRARY_PATH=$NVSHMEM_HOME/lib:$LD_LIBRARY_PATH
+ENV PATH=$NVSHMEM_HOME/bin:$PATH
+
+# =========================
+# Install NVSHMEM Python bindings (nvshmem4py)
+# =========================
+
+RUN pip install \
+    $NVSHMEM_HOME/lib/python/dist/nvshmem4py_cu12-*-manylinux*.whl
+# =========================
+# Change the workspace
+# =========================
+WORKDIR /home/
